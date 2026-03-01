@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Network Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        #visualization {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin: 20px auto;
+            max-width: 1000px;
+        }
+        svg {
+            display: block;
+        }
+        .node {
+            stroke: #fff;
+            stroke-width: 2px;
+            cursor: move;
+        }
+        .node:hover {
+            stroke: #333;
+            stroke-width: 3px;
+        }
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+        }
+        .link.dated {
+            stroke: #e74c3c;
+            stroke-width: 2px;
+        }
+        .link.friends {
+            stroke: #27ae60;
+            stroke-width: 2px;
+        }
+        .link.enemies {
+            stroke: #e67e22;
+            stroke-width: 3px;
+            stroke-dasharray: 5,5;
+        }
+        .node-label {
+            font-size: 12px;
+            font-weight: bold;
+            pointer-events: none;
+            text-anchor: middle;
+            dy: "0.3em";
+        }
+        .tooltip {
+            position: absolute;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            border-radius: 5px;
+            font-size: 12px;
+            pointer-events: none;
+            display: none;
+            z-index: 10;
+        }
+        .legend {
+            margin: 20px auto;
+            max-width: 1000px;
+            padding: 15px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .legend-item {
+            display: inline-block;
+            margin-right: 30px;
+            font-size: 14px;
+        }
+        .legend-line {
+            display: inline-block;
+            width: 30px;
+            height: 2px;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <h1>Social Network Visualization</h1>
+    
+    <div class="legend">
+        <div class="legend-item">
+            <span class="legend-line" style="background-color: #e74c3c;"></span>
+            <span>Dated</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-line" style="background-color: #27ae60;"></span>
+            <span>Friends</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-line" style="background-color: #e67e22; background-image: repeating-linear-gradient(90deg, #e67e22 0px, #e67e22 5px, transparent 5px, transparent 10px);"></span>
+            <span>Enemies</span>
+        </div>
+    </div>
+    
+    <div id="visualization"></div>
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        // Load data
+        d3.json('data.json').then(data => {
+            // Set dimensions
+            const width = 1000;
+            const height = 600;
+
+            // Create SVG
+            const svg = d3.select('#visualization')
+                .append('svg')
+                .attr('width', width)
+                .attr('height', height);
+
+            // Create force simulation
+            const simulation = d3.forceSimulation(data.nodes)
+                .force('link', d3.forceLink(data.links)
+                    .id(d => d.id)
+                    .distance(100))
+                .force('charge', d3.forceManyBody().strength(-300))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('collision', d3.forceCollide().radius(40));
+
+            // Create links
+            const links = svg.append('g')
+                .selectAll('line')
+                .data(data.links)
+                .enter()
+                .append('line')
+                .attr('class', d => `link ${d.relationship}`)
+                .attr('stroke-width', 2);
+
+            // Create nodes
+            const nodes = svg.append('g')
+                .selectAll('circle')
+                .data(data.nodes)
+                .enter()
+                .append('circle')
+                .attr('class', 'node')
+                .attr('r', 25)
+                .attr('fill', (d, i) => {
+                    const colors = ['#3498db', '#9b59b6', '#1abc9c'];
+                    return colors[i % colors.length];
+                })
+                .call(d3.drag()
+                    .on('start', dragStarted)
+                    .on('drag', dragged)
+                    .on('end', dragEnded))
+                .on('mouseenter', function(event, d) {
+                    d3.select('#tooltip')
+                        .style('display', 'block')
+                        .style('left', (event.pageX + 10) + 'px')
+                        .style('top', (event.pageY + 10) + 'px')
+                        .html(`<strong>${d.name}</strong><br/>Age: ${d.age}`);
+                })
+                .on('mousemove', function(event) {
+                    d3.select('#tooltip')
+                        .style('left', (event.pageX + 10) + 'px')
+                        .style('top', (event.pageY + 10) + 'px');
+                })
+                .on('mouseleave', function() {
+                    d3.select('#tooltip')
+                        .style('display', 'none');
+                });
+
+            // Create labels
+            const labels = svg.append('g')
+                .selectAll('text')
+                .data(data.nodes)
+                .enter()
+                .append('text')
+                .attr('class', 'node-label')
+                .text(d => d.name);
+
+            // Update positions on simulation tick
+            simulation.on('tick', () => {
+                links
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+
+                nodes
+                    .attr('cx', d => d.x)
+                    .attr('cy', d => d.y);
+
+                labels
+                    .attr('x', d => d.x)
+                    .attr('y', d => d.y);
+            });
+
+            // Drag functions
+            function dragStarted(event, d) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+
+            function dragEnded(event, d) {
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+        });
+    </script>
+</body>
+</html>

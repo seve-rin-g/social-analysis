@@ -1,0 +1,44 @@
+{
+  "nodes": [
+    {
+      "id": "1",
+      "name": "diesel",
+      "age": 42,
+      "location": "oakland"
+    },
+    {
+      "id": "2",
+      "name": "phaedra",
+      "age": 32
+    },
+    {
+      "id": "3",
+      "name": "bunny",
+      "age": 39
+    },
+    {
+      "id": "4",
+      "name": "RL",
+      "age": 30
+    }
+  ],
+  "links": [
+    {
+      "source": "1",
+      "target": "2",
+      "relationship": "dated",
+      "active": true
+    },
+    {
+      "source": "2",
+      "target": "3",
+      "relationship": "dated",
+      "active": false
+    },
+    {
+      "source": "4",
+      "target": "2",
+      "relationship": "enemies"
+    }
+  ]
+}
