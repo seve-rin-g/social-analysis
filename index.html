@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,58 +8,74 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
             margin: 0;
             padding: 20px;
             background-color: #f5f5f5;
         }
+
         h1 {
-            color: #333;
+            color: #ccc;
             text-align: center;
         }
+
         #visualization {
-            background-color: white;
+            background-color: black;
             border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             margin: 20px auto;
             max-width: 1000px;
         }
+
         svg {
             display: block;
         }
+
         .node {
             stroke: #fff;
-            stroke-width: 2px;
+            stroke-width: 1px;
             cursor: move;
         }
+
         .node:hover {
             stroke: #333;
             stroke-width: 3px;
         }
+
         .link {
             stroke: #999;
             stroke-opacity: 0.6;
         }
+
         .link.dated {
-            stroke: #e74c3c;
+            stroke: #3ce780;
             stroke-width: 2px;
         }
+
+        .link.hooked-up {
+            stroke: #ffff06;
+            stroke-width: 2px;
+            stroke-dasharray: 5, 5;
+        }
+
         .link.friends {
-            stroke: #27ae60;
+            stroke: #00d9ff;
             stroke-width: 2px;
         }
+
         .link.enemies {
-            stroke: #e67e22;
+            stroke: #ff0f0f;
             stroke-width: 3px;
-            stroke-dasharray: 5,5;
+            stroke-dasharray: 5, 5;
         }
+
         .node-label {
             font-size: 12px;
             font-weight: bold;
             pointer-events: none;
             text-anchor: middle;
-            dy: "0.3em";
         }
+
         .tooltip {
             position: absolute;
             padding: 10px;
@@ -70,19 +87,22 @@
             display: none;
             z-index: 10;
         }
+
         .legend {
             margin: 20px auto;
             max-width: 1000px;
             padding: 15px;
             background-color: white;
             border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
+
         .legend-item {
             display: inline-block;
             margin-right: 30px;
             font-size: 14px;
         }
+
         .legend-line {
             display: inline-block;
             width: 30px;
@@ -92,66 +112,83 @@
         }
     </style>
 </head>
+
 <body>
     <h1>Social Network Visualization</h1>
-    
+
     <div class="legend">
+        Relationships:
         <div class="legend-item">
-            <span class="legend-line" style="background-color: #e74c3c;"></span>
+            <input type="checkbox" class="toggle-relationship" data-type="dated" checked style="margin-right:6px;">
+            <span class="legend-line" style="background-color: #3ce780;"></span>
             <span>Dated</span>
         </div>
         <div class="legend-item">
-            <span class="legend-line" style="background-color: #27ae60;"></span>
+            <input type="checkbox" class="toggle-relationship" data-type="friends" checked style="margin-right:6px;">
+            <span class="legend-line" style="background-color: #00d9ff;"></span>
             <span>Friends</span>
         </div>
         <div class="legend-item">
-            <span class="legend-line" style="background-color: #e67e22; background-image: repeating-linear-gradient(90deg, #e67e22 0px, #e67e22 5px, transparent 5px, transparent 10px);"></span>
+            <input type="checkbox" class="toggle-relationship" data-type="enemies" checked style="margin-right:6px;">
+            <span class="legend-line"
+                style="background-color: #ff0f0f; background-image: repeating-linear-gradient(90deg, #ff0f0f 0px, #ff0f0f 5px, transparent 5px, transparent 10px);"></span>
             <span>Enemies</span>
         </div>
+        <div class="legend-item">
+            <input type="checkbox" class="toggle-relationship" data-type="hooked-up" checked style="margin-right:6px;">
+            <span class="legend-line" style="background-color: #ffff06;"></span>
+            <span>Hooked Up</span>
+        </div>
     </div>
-    
+
     <div id="visualization"></div>
     <div class="tooltip" id="tooltip"></div>
 
     <script>
+
+       
+
         // Load data
         d3.json('data.json').then(data => {
             // Set dimensions
             const width = 1000;
             const height = 600;
 
+            var relationshipTypes = Array.from(new Set(data.links.map(l => l.relationship)));
             // Create SVG
             const svg = d3.select('#visualization')
                 .append('svg')
                 .attr('width', width)
                 .attr('height', height);
 
+            // Store original data for filtering
+            // Normalize relationship types for consistency (e.g., 'hooked up' -> 'hooked-up')
+            const normalizeType = t => t.replace(/\s+/g, '-').toLowerCase();
+            data.links.forEach(l => { l.relationship = normalizeType(l.relationship); });
+            const allLinks = data.links;
+            const allNodes = data.nodes;
+
             // Create force simulation
-            const simulation = d3.forceSimulation(data.nodes)
-                .force('link', d3.forceLink(data.links)
+            const simulation = d3.forceSimulation(allNodes)
+                .force('link', d3.forceLink([])
                     .id(d => d.id)
                     .distance(100))
                 .force('charge', d3.forceManyBody().strength(-300))
                 .force('center', d3.forceCenter(width / 2, height / 2))
                 .force('collision', d3.forceCollide().radius(40));
 
-            // Create links
-            const links = svg.append('g')
-                .selectAll('line')
-                .data(data.links)
-                .enter()
-                .append('line')
-                .attr('class', d => `link ${d.relationship}`)
-                .attr('stroke-width', 2);
+            // Create links group
+            const linksGroup = svg.append('g').attr('id', 'links-group');
+            let links = linksGroup.selectAll('path');
 
             // Create nodes
             const nodes = svg.append('g')
                 .selectAll('circle')
-                .data(data.nodes)
+                .data(allNodes)
                 .enter()
                 .append('circle')
                 .attr('class', 'node')
-                .attr('r', 25)
+                .attr('r', 35)
                 .attr('fill', (d, i) => {
                     const colors = ['#3498db', '#9b59b6', '#1abc9c'];
                     return colors[i % colors.length];
@@ -160,19 +197,19 @@
                     .on('start', dragStarted)
                     .on('drag', dragged)
                     .on('end', dragEnded))
-                .on('mouseenter', function(event, d) {
+                .on('mouseenter', function (event, d) {
                     d3.select('#tooltip')
                         .style('display', 'block')
                         .style('left', (event.pageX + 10) + 'px')
                         .style('top', (event.pageY + 10) + 'px')
                         .html(`<strong>${d.name}</strong><br/>Age: ${d.age}`);
                 })
-                .on('mousemove', function(event) {
+                .on('mousemove', function (event) {
                     d3.select('#tooltip')
                         .style('left', (event.pageX + 10) + 'px')
                         .style('top', (event.pageY + 10) + 'px');
                 })
-                .on('mouseleave', function() {
+                .on('mouseleave', function () {
                     d3.select('#tooltip')
                         .style('display', 'none');
                 });
@@ -180,19 +217,90 @@
             // Create labels
             const labels = svg.append('g')
                 .selectAll('text')
-                .data(data.nodes)
+                .data(allNodes)
                 .enter()
                 .append('text')
                 .attr('class', 'node-label')
                 .text(d => d.name);
 
+            // Function to update links and simulation based on checkboxes
+            function computeLinkCurvature(links) {
+                // Group links by source-target pair (undirected)
+                const pairMap = {};
+                links.forEach((l, i) => {
+                    // Use min/max to make undirected
+                    const key = [l.source.id || l.source, l.target.id || l.target].sort().join('---');
+                    if (!pairMap[key]) pairMap[key] = [];
+                    pairMap[key].push(l);
+                });
+                // Assign index and total count to each link
+                links.forEach((l, i) => {
+                    const key = [l.source.id || l.source, l.target.id || l.target].sort().join('---');
+                    l.linkIndex = pairMap[key].indexOf(l);
+                    l.linkTotal = pairMap[key].length;
+                });
+            }
+
+            function updateLinksAndSimulation() {
+                // Get checked types
+                const checkedTypes = Array.from(document.querySelectorAll('.toggle-relationship:checked')).map(cb => cb.getAttribute('data-type'));
+                // Filter links
+                const filteredLinks = allLinks.filter(l => checkedTypes.includes(l.relationship));
+
+                // Compute curvature info
+                computeLinkCurvature(filteredLinks);
+
+                // Update links selection (use path instead of line)
+                links = linksGroup.selectAll('path')
+                    .data(filteredLinks, d => `${d.source.id || d.source}-${d.target.id || d.target}-${d.relationship}`);
+
+                links.exit().remove();
+
+                links = links.enter()
+                    .append('path')
+                    .attr('class', d => `link ${d.relationship}`)
+                    .attr('stroke-width', 2)
+                    .merge(links);
+
+                // Update force simulation links
+                simulation.force('link').links(filteredLinks);
+                simulation.alpha(0.5).restart();
+            }
+
+            // Initial render
+            updateLinksAndSimulation();
+
+            // Checkbox event listeners
+            document.querySelectorAll('.toggle-relationship').forEach(cb => {
+                cb.addEventListener('change', function () {
+                    updateLinksAndSimulation();
+                });
+            });
+
             // Update positions on simulation tick
             simulation.on('tick', () => {
                 links
-                    .attr('x1', d => d.source.x)
-                    .attr('y1', d => d.source.y)
-                    .attr('x2', d => d.target.x)
-                    .attr('y2', d => d.target.y);
+                    .attr('d', function (d) {
+                        // If only one link, draw straight line
+                        if (d.linkTotal === 1) {
+                            return `M${d.source.x},${d.source.y}L${d.target.x},${d.target.y}`;
+                        }
+                        // Multiple links: curve
+                        const dx = d.target.x - d.source.x;
+                        const dy = d.target.y - d.source.y;
+                        const dr = 60 + (d.linkIndex - (d.linkTotal - 1) / 2) * 30; // spread curves
+                        // Calculate normal for offset direction
+                        const mx = (d.source.x + d.target.x) / 2;
+                        const my = (d.source.y + d.target.y) / 2 + + (relationshipTypes.indexOf(d.relationship)+1)*10;
+                        const norm = Math.sqrt(dx * dx + dy * dy);
+                        const offsetX = -dy / norm * dr + (relationshipTypes.indexOf(d.relationship)+1)*100; // add some randomness to prevent perfect overlap
+                        const offsetY = dx / norm * dr; // add some randomness to prevent perfect overlap
+                        const cx = mx + offsetX;
+                        const cy = my + offsetY;
+                                               
+
+                        return `M${d.source.x},${d.source.y}Q${cx},${cy} ${d.target.x},${d.target.y}`;
+                    });
 
                 nodes
                     .attr('cx', d => d.x)
@@ -220,7 +328,11 @@
                 d.fx = null;
                 d.fy = null;
             }
-        });
+        }
+    
+    );
+
     </script>
 </body>
+
 </html>
