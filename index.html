@@ -55,7 +55,6 @@
         .link.hooked-up {
             stroke: #ffff06;
             stroke-width: 2px;
-            stroke-dasharray: 5, 5;
         }
 
         .link.friends {
@@ -66,7 +65,6 @@
         .link.enemies {
             stroke: #ff0f0f;
             stroke-width: 3px;
-            stroke-dasharray: 5, 5;
         }
 
         .node-label {
@@ -117,16 +115,16 @@
     <h1>Social Network Visualization</h1>
 
     <div class="legend">
+            <div style="margin: 20px auto; max-width: 1000px; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <label for="node-filter-dropdown"><strong>Hide nodes:</strong></label>
+                <select id="node-filter-dropdown" multiple size="6" style="width: 300px; margin-left: 10px;"></select>
+                <span style="font-size:12px; color:#888; margin-left:10px;">(Hold Ctrl/Cmd to select multiple)</span>
+            </div>
         Relationships:
         <div class="legend-item">
             <input type="checkbox" class="toggle-relationship" data-type="dated" checked style="margin-right:6px;">
             <span class="legend-line" style="background-color: #3ce780;"></span>
             <span>Dated</span>
-        </div>
-        <div class="legend-item">
-            <input type="checkbox" class="toggle-relationship" data-type="friends" checked style="margin-right:6px;">
-            <span class="legend-line" style="background-color: #00d9ff;"></span>
-            <span>Friends</span>
         </div>
         <div class="legend-item">
             <input type="checkbox" class="toggle-relationship" data-type="enemies" checked style="margin-right:6px;">
@@ -137,7 +135,7 @@
         <div class="legend-item">
             <input type="checkbox" class="toggle-relationship" data-type="hooked-up" checked style="margin-right:6px;">
             <span class="legend-line" style="background-color: #ffff06;"></span>
-            <span>Hooked Up</span>
+            <span>Hookup</span>
         </div>
     </div>
 
@@ -150,9 +148,17 @@
 
         // Load data
         d3.json('data.json').then(data => {
+            // Populate dropdown with node names
+            const dropdown = document.getElementById('node-filter-dropdown');
+            data.nodes.forEach(node => {
+                const option = document.createElement('option');
+                option.value = node.id;
+                option.textContent = node.alias;
+                dropdown.appendChild(option);
+            });
             // Set dimensions
             const width = 1000;
-            const height = 600;
+            const height = 1000;
 
             var relationshipTypes = Array.from(new Set(data.links.map(l => l.relationship)));
             // Create SVG
@@ -167,6 +173,7 @@
             data.links.forEach(l => { l.relationship = normalizeType(l.relationship); });
             const allLinks = data.links;
             const allNodes = data.nodes;
+            let filteredNodeIds = [];
 
             // Create force simulation
             const simulation = d3.forceSimulation(allNodes)
@@ -202,7 +209,7 @@
                         .style('display', 'block')
                         .style('left', (event.pageX + 10) + 'px')
                         .style('top', (event.pageY + 10) + 'px')
-                        .html(`<strong>${d.name}</strong><br/>Age: ${d.age}`);
+                        .html(`<strong>${d.alias}</strong><br/>Id: ${d.id}`);
                 })
                 .on('mousemove', function (event) {
                     d3.select('#tooltip')
@@ -221,7 +228,7 @@
                 .enter()
                 .append('text')
                 .attr('class', 'node-label')
-                .text(d => d.name);
+                .text(d => d.alias);
 
             // Function to update links and simulation based on checkboxes
             function computeLinkCurvature(links) {
@@ -244,8 +251,13 @@
             function updateLinksAndSimulation() {
                 // Get checked types
                 const checkedTypes = Array.from(document.querySelectorAll('.toggle-relationship:checked')).map(cb => cb.getAttribute('data-type'));
-                // Filter links
-                const filteredLinks = allLinks.filter(l => checkedTypes.includes(l.relationship));
+                // Get filtered node ids
+                filteredNodeIds = Array.from(dropdown.selectedOptions).map(opt => parseInt(opt.value));
+
+                // Filter nodes and links
+                const visibleNodes = allNodes.filter(n => !filteredNodeIds.includes(n.id));
+                const visibleNodeIds = new Set(visibleNodes.map(n => n.id));
+                const filteredLinks = allLinks.filter(l => checkedTypes.includes(l.relationship) && visibleNodeIds.has(l.source.id || l.source) && visibleNodeIds.has(l.target.id || l.target));
 
                 // Compute curvature info
                 computeLinkCurvature(filteredLinks);
@@ -262,9 +274,64 @@
                     .attr('stroke-width', 2)
                     .merge(links);
 
-                // Update force simulation links
+                // Set stroke-dasharray based on 'active' property
+                links.each(function(d) {
+                    // Treat undefined 'active' as true (solid)
+                    if (d.active == false) {
+                        d3.select(this).attr('stroke-dasharray', '5,5');
+                    } else {
+                        d3.select(this).attr('stroke-dasharray', null);
+                    }
+                });
+
+                // Update force simulation links and nodes
+                simulation.nodes(visibleNodes);
                 simulation.force('link').links(filteredLinks);
                 simulation.alpha(0.5).restart();
+
+                // Update node circles
+                nodes.data(visibleNodes, d => d.id)
+                    .join(
+                        enter => enter.append('circle')
+                            .attr('class', 'node')
+                            .attr('r', 35)
+                            .attr('fill', (d, i) => {
+                                const colors = ['#3498db', '#9b59b6', '#1abc9c'];
+                                return colors[i % colors.length];
+                            })
+                            .call(d3.drag()
+                                .on('start', dragStarted)
+                                .on('drag', dragged)
+                                .on('end', dragEnded))
+                            .on('mouseenter', function (event, d) {
+                                d3.select('#tooltip')
+                                    .style('display', 'block')
+                                    .style('left', (event.pageX + 10) + 'px')
+                                    .style('top', (event.pageY + 10) + 'px')
+                                    .html(`<strong>${d.name}</strong><br/>Id: ${d.id}`);
+                            })
+                            .on('mousemove', function (event) {
+                                d3.select('#tooltip')
+                                    .style('left', (event.pageX + 10) + 'px')
+                                    .style('top', (event.pageY + 10) + 'px');
+                            })
+                            .on('mouseleave', function () {
+                                d3.select('#tooltip')
+                                    .style('display', 'none');
+                            }),
+                        update => update,
+                        exit => exit.remove()
+                    );
+
+                // Update labels
+                labels.data(visibleNodes, d => d.id)
+                    .join(
+                        enter => enter.append('text')
+                            .attr('class', 'node-label')
+                            .text(d => d.name),
+                        update => update,
+                        exit => exit.remove()
+                    );
             }
 
             // Initial render
@@ -275,6 +342,10 @@
                 cb.addEventListener('change', function () {
                     updateLinksAndSimulation();
                 });
+            });
+            // Dropdown event listener
+            dropdown.addEventListener('change', function () {
+                updateLinksAndSimulation();
             });
 
             // Update positions on simulation tick
@@ -288,25 +359,24 @@
                         // Multiple links: curve
                         const dx = d.target.x - d.source.x;
                         const dy = d.target.y - d.source.y;
-                        const dr = 60 + (d.linkIndex - (d.linkTotal - 1) / 2) * 30; // spread curves
+                        const dr = 60 + (d.linkIndex - (d.linkTotal - 1) / 2) * 10; // spread curves
                         // Calculate normal for offset direction
                         const mx = (d.source.x + d.target.x) / 2;
-                        const my = (d.source.y + d.target.y) / 2 + + (relationshipTypes.indexOf(d.relationship)+1)*10;
+                        const my = (d.source.y + d.target.y) / 2 + + (relationshipTypes.indexOf(d.relationship)+1)*2;
                         const norm = Math.sqrt(dx * dx + dy * dy);
-                        const offsetX = -dy / norm * dr + (relationshipTypes.indexOf(d.relationship)+1)*100; // add some randomness to prevent perfect overlap
+                        const offsetX = -dy / norm * dr + (relationshipTypes.indexOf(d.relationship)+1)*50; // add some randomness to prevent perfect overlap
                         const offsetY = dx / norm * dr; // add some randomness to prevent perfect overlap
                         const cx = mx + offsetX;
                         const cy = my + offsetY;
-                                               
-
                         return `M${d.source.x},${d.source.y}Q${cx},${cy} ${d.target.x},${d.target.y}`;
                     });
 
-                nodes
+                // Only render visible nodes and labels
+                nodes.filter(d => !filteredNodeIds.includes(d.id))
                     .attr('cx', d => d.x)
                     .attr('cy', d => d.y);
 
-                labels
+                labels.filter(d => !filteredNodeIds.includes(d.id))
                     .attr('x', d => d.x)
                     .attr('y', d => d.y);
             });
