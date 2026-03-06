@@ -4,19 +4,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.cdnfonts.com/css/pp-pangaia" rel="stylesheet">
     <title>Social Network Visualization</title>
+    <!-- Choices.js CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
+    <!-- Choices.js JS -->
+    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         body {
-            font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+            font-family: 'PP Pangaia', sans-serif;
             margin: 0;
             padding: 20px;
-            background-color: #f5f5f5;
+            background-color: #000;
         }
 
         h1 {
+            font-family: 'PP Pangaia', sans-serif;
             color: #ccc;
             text-align: center;
+            font-weight: 400;
+            font-size: 4em;
         }
 
         #visualization {
@@ -35,6 +43,7 @@
             stroke: #fff;
             stroke-width: 1px;
             cursor: move;
+            color: red;
         }
 
         .node:hover {
@@ -53,7 +62,7 @@
         }
 
         .link.hooked-up {
-            stroke: #ffff06;
+            stroke: rgb(185, 81, 255);
             stroke-width: 2px;
         }
 
@@ -68,10 +77,11 @@
         }
 
         .node-label {
-            font-size: 12px;
+            font-size: 16px;
             font-weight: bold;
             pointer-events: none;
             text-anchor: middle;
+            color: #f00
         }
 
         .tooltip {
@@ -80,7 +90,7 @@
             background-color: rgba(0, 0, 0, 0.8);
             color: white;
             border-radius: 5px;
-            font-size: 12px;
+            font-size: 1.4em;
             pointer-events: none;
             display: none;
             z-index: 10;
@@ -115,11 +125,6 @@
     <h1>Social Network Visualization</h1>
 
     <div class="legend">
-            <div style="margin: 20px auto; max-width: 1000px; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                <label for="node-filter-dropdown"><strong>Hide nodes:</strong></label>
-                <select id="node-filter-dropdown" multiple size="6" style="width: 300px; margin-left: 10px;"></select>
-                <span style="font-size:12px; color:#888; margin-left:10px;">(Hold Ctrl/Cmd to select multiple)</span>
-            </div>
         Relationships:
         <div class="legend-item">
             <input type="checkbox" class="toggle-relationship" data-type="dated" checked style="margin-right:6px;">
@@ -134,8 +139,13 @@
         </div>
         <div class="legend-item">
             <input type="checkbox" class="toggle-relationship" data-type="hooked-up" checked style="margin-right:6px;">
-            <span class="legend-line" style="background-color: #ffff06;"></span>
+            <span class="legend-line" style="background-color: rgb(185, 81, 255);"></span>
             <span>Hookup</span>
+        </div>
+        <div
+            style="margin: 20px auto; max-width: 1000px; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <label for="node-filter-dropdown"><strong>Hide names:</strong></label>
+            <select id="node-filter-dropdown" class="form-select" multiple></select>
         </div>
     </div>
 
@@ -143,8 +153,24 @@
     <div class="tooltip" id="tooltip"></div>
 
     <script src="social-analysis.js">
-       
-
+</script>    <script>
+    // Choices.js initialization for node filter
+    document.addEventListener('DOMContentLoaded', function() {
+        const dropdown = document.getElementById('node-filter-dropdown');
+        // Wait for dropdown to be populated by main script
+        const observer = new MutationObserver(() => {
+            if (dropdown.options.length > 0 && !dropdown.choicesInstance) {
+                dropdown.choicesInstance = new Choices(dropdown, {
+                    removeItemButton: true,
+                    searchEnabled: true,
+                    searchPlaceholderValue: 'Search nodes...',
+                    placeholderValue: 'Select nodes to hide',
+                    shouldSort: false
+                });
+            }
+        });
+        observer.observe(dropdown, {childList: true});
+    });
     </script>
 </body>
 
